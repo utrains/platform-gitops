@@ -1,0 +1,17 @@
+name: validate app requests
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: azure/setup-helm@v4
+        with:
+          version: v3.17.3
+      - name: Validate apps/<name>/<env>.yaml and render the chart
+        run: bash scripts/validate.sh
