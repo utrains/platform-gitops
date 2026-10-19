@@ -1,0 +1,10 @@
+# App "files", env "dev" -> https://files-dev.afriqhome.com
+# nginx serving its web root from a SHARED EFS volume: a file written by one pod is served by all.
+image: nginx:1.27
+port: 80
+replicas: 3
+healthPath: /healthz.html
+volume:
+  type: shared
+  size: 1Gi
+  mountPath: /usr/share/nginx/html

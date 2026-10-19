@@ -1,0 +1,18 @@
+{{- with .Values.app.volume }}
+# Persistent volume of the app: EFS (shared, ReadWriteMany) or EBS (disk, ReadWriteOnce).
+# Deleted with the app (reclaimPolicy Delete): back up the data before removing an app.
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ include "app.pvc" $ }}
+  namespace: {{ include "app.namespace" $ }}
+  labels:
+    {{- include "app.labels" $ | nindent 4 }}
+spec:
+  accessModes:
+    - {{ if eq .type "shared" }}ReadWriteMany{{ else }}ReadWriteOnce{{ end }}
+  storageClassName: {{ if eq .type "shared" }}{{ $.Values.platform.storageClasses.shared }}{{ else }}{{ $.Values.platform.storageClasses.disk }}{{ end }}
+  resources:
+    requests:
+      storage: {{ .size | default "5Gi" }}
+{{- end }}

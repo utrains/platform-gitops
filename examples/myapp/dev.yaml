@@ -26,3 +26,8 @@ port: 80               # port your container listens on (plain HTTP)
 #   minReplicas: 2
 #   maxReplicas: 6
 #   cpuTarget: 70
+# volume:              # persistent storage mounted in every pod (PVC <name>-data)
+#   type: shared       # shared = EFS: all replicas share the files, all zones (uploads, content)
+#                      # disk   = EBS gp3: fastest, ONE pod only (replicas: 1, no autoscaling)
+#   size: 5Gi
+#   mountPath: /data

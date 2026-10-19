@@ -11,6 +11,10 @@ spec:
   {{- if not $a.autoscaling.enabled }}
   replicas: {{ $a.replicas }}
   {{- end }}
+  {{- if and $a.volume (eq $a.volume.type "disk") }}
+  strategy:
+    type: Recreate      # an EBS volume attaches to one pod: stop the old pod before starting the new one
+  {{- end }}
   selector:
     matchLabels:
       {{- include "app.selector" . | nindent 6 }}
@@ -26,6 +30,11 @@ spec:
           labelSelector:
             matchLabels:
               {{- include "app.selector" . | nindent 14 }}
+      {{- if and $a.volume (eq $a.volume.type "disk") }}
+      securityContext:
+        fsGroup: 1000                       # non-root images can write to the EBS volume
+        fsGroupChangePolicy: OnRootMismatch
+      {{- end }}
       containers:
         - name: app
           image: {{ $a.image }}
@@ -56,6 +65,17 @@ spec:
             {{- toYaml $a.resources | nindent 12 }}
           securityContext:
             allowPrivilegeEscalation: false
+          {{- with $a.volume }}
+          volumeMounts:
+            - name: data
+              mountPath: {{ .mountPath }}
+          {{- end }}
+      {{- with $a.volume }}
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: {{ include "app.pvc" $ }}
+      {{- end }}
 ---
 apiVersion: v1
 kind: Service

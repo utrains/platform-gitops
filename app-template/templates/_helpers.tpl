@@ -18,12 +18,24 @@ Naming convention. Everything is derived from app.name and app.env:
 {{- if not (has ($a.env | toString) (list "dev" "staging" "prod")) -}}
 {{- fail (printf "app.env %q is invalid: use dev, staging or prod" ($a.env | toString)) -}}
 {{- end -}}
+{{- with $a.volume -}}
+{{- if not (has (.type | toString) (list "shared" "disk")) -}}
+{{- fail (printf "volume.type %q is invalid: use shared (EFS, many pods) or disk (EBS, one pod)" (.type | toString)) -}}
+{{- end -}}
+{{- if not (hasPrefix "/" (.mountPath | toString)) -}}
+{{- fail "volume.mountPath must be an absolute path, e.g. /data" -}}
+{{- end -}}
+{{- if and (eq .type "disk") (or $a.autoscaling.enabled (gt (int $a.replicas) 1)) -}}
+{{- fail "volume.type disk (EBS) can be attached to ONE pod only: set replicas: 1 and no autoscaling, or use volume.type shared (EFS)" -}}
+{{- end -}}
+{{- end -}}
 {{- end -}}
 
 {{- define "app.name" -}}{{ .Values.app.name }}{{- end -}}
 {{- define "app.id" -}}{{ .Values.app.name }}-{{ .Values.app.env }}{{- end -}}
 {{- define "app.namespace" -}}{{ include "app.id" . }}{{- end -}}
 {{- define "app.tlsSecret" -}}{{ include "app.id" . }}-tls{{- end -}}
+{{- define "app.pvc" -}}{{ .Values.app.name }}-data{{- end -}}
 {{- define "app.gateway" -}}{{ include "app.id" . }}{{- end -}}
 
 {{- define "app.host" -}}

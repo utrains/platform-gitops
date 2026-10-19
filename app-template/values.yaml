@@ -4,6 +4,9 @@
 platform:
   domain: example.com
   clusterIssuer: letsencrypt
+  storageClasses:
+    shared: efs     # EFS, ReadWriteMany (many pods, all zones)
+    disk: gp3       # EBS, ReadWriteOnce (one pod at a time)
   ingress:
     namespace: istio-ingress
     serviceDNS: istio-ingress.istio-ingress.svc.cluster.local
@@ -33,3 +36,10 @@ app:
     minReplicas: 2
     maxReplicas: 6
     cpuTarget: 70     # % of the CPU request
+  # Optional persistent volume, mounted in every pod of the app. Empty = no volume.
+  #   type: shared -> EFS: all replicas read/write the same files, in every zone (uploads, content)
+  #   type: disk   -> EBS gp3: fastest, but ONE pod only (replicas: 1, no autoscaling), one zone
+  volume: {}
+  #  type: shared
+  #  size: 5Gi
+  #  mountPath: /data
