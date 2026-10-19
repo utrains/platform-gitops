@@ -1,0 +1,10 @@
+{{- include "app.validate" . -}}
+# The app namespace is part of the chart (not created by Argo CD's CreateNamespace option),
+# so it is deleted together with the app when the app request file is removed.
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: {{ include "app.namespace" . }}
+  labels:
+    {{- include "app.labels" . | nindent 4 }}
+    istio-injection: enabled          # every pod gets an Envoy sidecar (mutual TLS)
