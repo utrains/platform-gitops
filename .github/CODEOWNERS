@@ -1,0 +1,11 @@
+# Who must approve a pull request (enable "Require review from Code Owners" on main).
+# Replace the handles with your GitHub teams, e.g. @utrains/platform-team, @utrains/team-shop.
+
+# The platform team owns the template and the repository settings
+/app-template/   @utrains/platform-team
+/.github/        @utrains/platform-team
+/examples/       @utrains/platform-team
+
+# Each app team owns its own folder
+# /apps/shop/    @utrains/team-shop
+/apps/           @utrains/platform-team

@@ -1,0 +1,6 @@
+# App "whoami" (folder name), environment "prod" (file name) -> https://whoami.afriqhome.com
+image: traefik/whoami:v1.11.0
+port: 80
+replicas: 3
+env_vars:
+  WHOAMI_NAME: whoami-prod

@@ -1,0 +1,28 @@
+# App request template.
+#
+#   1. Create a folder with your app name:   apps/<name>/          (e.g. apps/shop/)
+#   2. Copy this file as <env>.yaml in it:  apps/<name>/dev.yaml   (dev | staging | prod)
+#   3. Set at least your image, open a pull request.
+#
+# After the merge, Argo CD deploys the app within ~3 to 5 minutes at:
+#   https://<name>-<env>.afriqhome.com        (prod: https://<name>.afriqhome.com)
+#
+# <name>: 2-30 chars, lowercase letters, digits, "-", starts with a letter.
+# Do not put "name" or "env" in this file: they come from the folder and the file name.
+
+image: nginx:1.27      # your container image, with a pinned tag (never "latest")
+port: 80               # port your container listens on (plain HTTP)
+
+# OPTIONAL (defaults shown) ----------------------------------------------------
+# replicas: 2
+# healthPath: /        # readiness / liveness probe path, must answer 200
+# env_vars:            # extra environment variables (no secrets here)
+#   LOG_LEVEL: info
+# resources:
+#   requests: {cpu: 50m, memory: 64Mi}
+#   limits: {memory: 256Mi}
+# autoscaling:
+#   enabled: false
+#   minReplicas: 2
+#   maxReplicas: 6
+#   cpuTarget: 70

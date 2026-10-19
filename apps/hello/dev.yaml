@@ -1,0 +1,3 @@
+# App "hello" (folder name), environment "dev" (file name) -> https://hello-dev.afriqhome.com
+image: nginx:1.27
+port: 80
