@@ -1,0 +1,89 @@
+{{- include "team.validate" . -}}
+{{- $team := .Values.team -}}
+{{- range $env := $team.envs }}
+{{- $ns := printf "%s-%s" $team.name $env }}
+{{- $labels := include "team.labels" (dict "team" $team.name "env" $env) }}
+# ---------- {{ $ns }} ----------
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: {{ $ns }}
+  labels:
+    {{- $labels | nindent 4 }}
+    istio-injection: enabled              # every pod gets an Envoy sidecar (mutual TLS)
+---
+# Who may do what. The groups come from EKS access entries (IAM role -> Kubernetes group).
+# Admins manage everything in the namespace, including RoleBindings.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: {{ $team.name }}-admins
+  namespace: {{ $ns }}
+  labels:
+    {{- $labels | nindent 4 }}
+subjects:
+  - kind: Group
+    name: {{ $team.name }}-admins
+    apiGroup: rbac.authorization.k8s.io
+roleRef:
+  kind: ClusterRole
+  name: admin
+  apiGroup: rbac.authorization.k8s.io
+---
+# Developers deploy in dev and staging; in prod they can only read (prod changes go through Git).
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: {{ $team.name }}-developers
+  namespace: {{ $ns }}
+  labels:
+    {{- $labels | nindent 4 }}
+subjects:
+  - kind: Group
+    name: {{ $team.name }}-developers
+    apiGroup: rbac.authorization.k8s.io
+roleRef:
+  kind: ClusterRole
+  name: {{ eq $env "prod" | ternary "view" "edit" }}
+  apiGroup: rbac.authorization.k8s.io
+---
+# How much the namespace may use in total. No LoadBalancer or NodePort Services:
+# traffic comes in through the shared gateway only (one load balancer for every team).
+apiVersion: v1
+kind: ResourceQuota
+metadata:
+  name: {{ $team.name }}-quota
+  namespace: {{ $ns }}
+  labels:
+    {{- $labels | nindent 4 }}
+spec:
+  hard:
+    requests.cpu: {{ $team.quota.requestsCpu | quote }}
+    requests.memory: {{ $team.quota.requestsMemory }}
+    limits.cpu: {{ $team.quota.limitsCpu | quote }}
+    limits.memory: {{ $team.quota.limitsMemory }}
+    pods: {{ $team.quota.pods | quote }}
+    persistentvolumeclaims: {{ $team.quota.pvcs | quote }}
+    requests.storage: {{ $team.quota.storage }}
+    services.loadbalancers: "0"
+    services.nodeports: "0"
+---
+# Defaults for containers that set no requests/limits (otherwise the quota rejects them)
+apiVersion: v1
+kind: LimitRange
+metadata:
+  name: {{ $team.name }}-defaults
+  namespace: {{ $ns }}
+  labels:
+    {{- $labels | nindent 4 }}
+spec:
+  limits:
+    - type: Container
+      defaultRequest:
+        cpu: {{ $team.defaults.requestCpu }}
+        memory: {{ $team.defaults.requestMemory }}
+      default:
+        cpu: {{ $team.defaults.limitCpu }}
+        memory: {{ $team.defaults.limitMemory }}
+---
+{{- end }}

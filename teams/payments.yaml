@@ -1,0 +1,3 @@
+# Team "payments": namespaces payments-dev and payments-prod.
+# Groups: payments-admins (admin everywhere), payments-developers (edit in dev, read-only in prod).
+envs: [dev, prod]

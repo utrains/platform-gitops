@@ -1,0 +1,60 @@
+# Logs store: Loki in single-binary mode, chunks and index on a gp3 volume.
+# One replica is enough for a few GB of logs a day. For more, switch to the SimpleScalable mode
+# with an S3 bucket (created by terraform, with a Pod Identity role).
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: loki
+  {{- include "addons.appMeta" . | nindent 2 }}
+spec:
+  project: default
+  source:
+    repoURL: https://grafana.github.io/helm-charts
+    chart: loki
+    targetRevision: {{ .Values.versions.loki }}
+    helm:
+      releaseName: loki
+      valuesObject:
+        deploymentMode: SingleBinary
+        loki:
+          auth_enabled: false        # one tenant; teams are told apart by the "namespace" label
+          commonConfig:
+            replication_factor: 1
+          storage:
+            type: filesystem
+          schemaConfig:
+            configs:
+              - from: "2024-01-01"
+                store: tsdb
+                object_store: filesystem
+                schema: v13
+                index: {prefix: index_, period: 24h}
+          limits_config:
+            retention_period: {{ .Values.retention.logs }}
+          compactor:
+            retention_enabled: true
+            delete_request_store: filesystem
+        singleBinary:
+          replicas: 1
+          persistence:
+            storageClass: {{ .Values.storage.storageClass }}
+            size: {{ .Values.storage.loki }}
+          resources:
+            requests: {cpu: 100m, memory: 512Mi}
+        # SimpleScalable components off
+        read: {replicas: 0}
+        write: {replicas: 0}
+        backend: {replicas: 0}
+        # caches, gateway, canary and test pods are not needed for one replica
+        gateway: {enabled: false}
+        chunksCache: {enabled: false}
+        resultsCache: {enabled: false}
+        lokiCanary: {enabled: false}
+        test: {enabled: false}
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: {{ .Values.namespace }}
+  syncPolicy:
+    automated: {prune: true, selfHeal: true}
+    syncOptions:
+      - CreateNamespace=true

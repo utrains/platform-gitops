@@ -1,0 +1,27 @@
+# Set by Argo CD (ApplicationSet "teams"): team.name comes from the file name teams/<team>.yaml,
+# the rest of team.* from the file content. platform.* is set by terraform.
+platform:
+  domain: example.com
+  clusterIssuer: letsencrypt
+  ingress:
+    namespace: istio-ingress
+    serviceDNS: istio-ingress.istio-ingress.svc.cluster.local
+    lbHostname: ""
+  monitoringNamespace: monitoring
+
+team:
+  name: ""
+  envs: [dev, prod]          # one namespace per environment: <team>-<env>
+  quota:                     # per namespace
+    requestsCpu: "4"
+    requestsMemory: 8Gi
+    limitsCpu: "8"
+    limitsMemory: 16Gi
+    pods: "40"
+    pvcs: "10"
+    storage: 100Gi
+  defaults:                  # LimitRange: applied to containers that set no requests/limits
+    requestCpu: 100m
+    requestMemory: 128Mi
+    limitCpu: 500m
+    limitMemory: 512Mi

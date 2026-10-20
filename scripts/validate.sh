@@ -36,6 +36,27 @@ for dir in apps/*/; do
   done
 done
 
+# Team requests: teams/<team>.yaml -> namespaces <team>-<env>
+for f in teams/*; do
+  file=$(basename "$f")
+  team="${file%.yaml}"
+  if [[ "$file" != *.yaml ]]; then fail "$f: only <team>.yaml files are allowed"; continue; fi
+  if grep -Eq '^name:' "$f"; then fail "$f: do not set 'name', it comes from the file name"; fi
+  vals=$(mktemp)
+  { echo "team:"; sed 's/^/  /' "$f"; echo "  name: $team"; } > "$vals"
+  if out=$(helm template "$team" team-template -f "$vals" --set platform.domain=example.com --set platform.ingress.lbHostname=lb.example.com 2>&1); then
+    echo "OK   $f -> $(echo "$out" | grep -c '^kind:') objects"
+    # a team namespace must not be the namespace of an app (<name>-<env>)
+    for ns in $(echo "$out" | awk '/^kind: Namespace/{n=1} n&&/^  name:/{print $2; n=0}'); do
+      app="${ns%-*}"; env="${ns##*-}"
+      [ -f "apps/$app/$env.yaml" ] && fail "$f: namespace $ns is already used by apps/$app/$env.yaml"
+    done
+  else
+    fail "$f: $(echo "$out" | grep -m1 -E 'Error|error')"
+  fi
+  rm -f "$vals"
+done
+
 echo
 if [ $errors -gt 0 ]; then echo "$errors error(s)"; exit 1; fi
-echo "All app requests are valid."
+echo "All app and team requests are valid."

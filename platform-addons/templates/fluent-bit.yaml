@@ -1,0 +1,32 @@
+# Log shipping: Fluent Bit on every node reads the container logs, adds the Kubernetes metadata
+# and sends them to Loki with the labels namespace, pod and container.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: fluent-bit
+  {{- include "addons.appMeta" . | nindent 2 }}
+spec:
+  project: default
+  source:
+    repoURL: https://fluent.github.io/helm-charts
+    chart: fluent-bit
+    targetRevision: {{ .Values.versions.fluentBit }}
+    helm:
+      releaseName: fluent-bit
+      valuesObject:
+        config:
+          outputs: |
+            [OUTPUT]
+                Name        loki
+                Match       kube.*
+                Host        loki.{{ .Values.namespace }}.svc.cluster.local
+                Port        3100
+                Labels      job=fluent-bit, namespace=$kubernetes['namespace_name'], pod=$kubernetes['pod_name'], container=$kubernetes['container_name']
+                Line_Format json
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: {{ .Values.namespace }}
+  syncPolicy:
+    automated: {prune: true, selfHeal: true}
+    syncOptions:
+      - CreateNamespace=true

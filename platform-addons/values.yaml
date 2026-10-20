@@ -1,0 +1,27 @@
+# Cluster-specific values are set by terraform (platform-config chart, Application "platform-addons").
+# Everything else, chart versions included, is changed here through a pull request.
+platform:
+  domain: example.com
+  ingress:
+    namespace: istio-ingress
+    serviceDNS: istio-ingress.istio-ingress.svc.cluster.local
+    lbHostname: ""
+
+namespace: monitoring
+
+grafana:
+  subdomain: grafana            # Grafana UI at https://grafana.<domain>
+
+versions:
+  kubePrometheusStack: 92.11.0  # Prometheus, Grafana, kube-state-metrics, node-exporter
+  loki: 7.3.0
+  fluentBit: 0.58.3
+
+retention:
+  metrics: 7d
+  logs: 168h                    # 7 days
+
+storage:
+  storageClass: gp3
+  prometheus: 20Gi
+  loki: 20Gi

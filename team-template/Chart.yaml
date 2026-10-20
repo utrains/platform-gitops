@@ -1,0 +1,5 @@
+apiVersion: v2
+name: team-template
+description: Everything a team gets, per environment - namespace, RBAC, quota, limits, network policies, HTTPS gateway
+type: application
+version: 1.0.0

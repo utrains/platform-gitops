@@ -1,0 +1,84 @@
+# Grafana UI at https://grafana.<domain>, through the shared ingress gateway (no new load balancer).
+# Same pattern as the apps: certificate + Gateway in the ingress namespace, routes next to the service.
+{{- $host := include "addons.grafanaHost" . }}
+{{- $ing := .Values.platform.ingress }}
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: grafana-tls
+  namespace: {{ $ing.namespace }}
+spec:
+  secretName: grafana-tls
+  dnsNames:
+    - {{ $host }}
+  issuerRef:
+    kind: ClusterIssuer
+    name: letsencrypt
+---
+apiVersion: gateway.networking.k8s.io/v1
+kind: Gateway
+metadata:
+  name: grafana
+  namespace: {{ $ing.namespace }}
+  annotations:
+    external-dns.alpha.kubernetes.io/target: {{ $ing.lbHostname }}
+spec:
+  gatewayClassName: istio
+  addresses:
+    - type: Hostname
+      value: {{ $ing.serviceDNS }}
+  listeners:
+    {{- range $l := list (dict "name" "http" "port" 80 "protocol" "HTTP") (dict "name" "https" "port" 443 "protocol" "HTTPS") }}
+    - name: {{ $l.name }}
+      port: {{ $l.port }}
+      protocol: {{ $l.protocol }}
+      hostname: {{ $host }}
+      {{- if eq $l.name "https" }}
+      tls:
+        mode: Terminate
+        certificateRefs:
+          - name: grafana-tls
+      {{- end }}
+      allowedRoutes:
+        namespaces:
+          from: Selector
+          selector:
+            matchLabels:
+              kubernetes.io/metadata.name: {{ $.Values.namespace }}
+    {{- end }}
+---
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: grafana
+  namespace: {{ .Values.namespace }}
+spec:
+  parentRefs:
+    - name: grafana
+      namespace: {{ $ing.namespace }}
+      sectionName: https
+  hostnames:
+    - {{ $host }}
+  rules:
+    - backendRefs:
+        - name: grafana
+          port: 80
+---
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: grafana-redirect
+  namespace: {{ .Values.namespace }}
+spec:
+  parentRefs:
+    - name: grafana
+      namespace: {{ $ing.namespace }}
+      sectionName: http
+  hostnames:
+    - {{ $host }}
+  rules:
+    - filters:
+        - type: RequestRedirect
+          requestRedirect:
+            scheme: https
+            statusCode: 301

@@ -1,0 +1,5 @@
+apiVersion: v2
+name: platform-addons
+description: Platform add-ons managed by Argo CD (observability stack), one Argo CD Application each
+type: application
+version: 1.0.0

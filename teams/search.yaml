@@ -1,0 +1,10 @@
+# Team "search": namespace search-dev only, with a smaller quota.
+envs: [dev]
+quota:
+  requestsCpu: "2"
+  requestsMemory: 4Gi
+  limitsCpu: "4"
+  limitsMemory: 8Gi
+  pods: "20"
+  pvcs: "5"
+  storage: 50Gi

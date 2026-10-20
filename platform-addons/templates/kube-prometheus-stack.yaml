@@ -1,0 +1,59 @@
+# Metrics: Prometheus (+ operator, kube-state-metrics, node-exporter) and Grafana with Loki as a
+# second data source. Built-in dashboards show CPU, memory and network per namespace and per pod.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: kube-prometheus-stack
+  {{- include "addons.appMeta" . | nindent 2 }}
+spec:
+  project: default
+  source:
+    repoURL: https://prometheus-community.github.io/helm-charts
+    chart: kube-prometheus-stack
+    targetRevision: {{ .Values.versions.kubePrometheusStack }}
+    helm:
+      releaseName: kube-prometheus-stack
+      valuesObject:
+        # EKS runs the control plane: these components cannot be scraped from the cluster
+        kubeControllerManager: {enabled: false}
+        kubeScheduler: {enabled: false}
+        kubeEtcd: {enabled: false}
+        kubeProxy: {enabled: false}
+        # no alert receivers are defined yet: add Alertmanager when the on-call channel exists
+        alertmanager: {enabled: false}
+        prometheus:
+          prometheusSpec:
+            retention: {{ .Values.retention.metrics }}
+            # pick up every ServiceMonitor / PodMonitor / rule in the cluster, not only this release's
+            serviceMonitorSelectorNilUsesHelmValues: false
+            podMonitorSelectorNilUsesHelmValues: false
+            ruleSelectorNilUsesHelmValues: false
+            resources:
+              requests: {cpu: 200m, memory: 1Gi}
+            storageSpec:
+              volumeClaimTemplate:
+                spec:
+                  storageClassName: {{ .Values.storage.storageClass }}
+                  accessModes: [ReadWriteOnce]
+                  resources:
+                    requests:
+                      storage: {{ .Values.storage.prometheus }}
+        grafana:
+          fullnameOverride: grafana
+          grafana.ini:
+            server:
+              root_url: https://{{ include "addons.grafanaHost" . }}
+          additionalDataSources:
+            - name: Loki
+              type: loki
+              uid: loki
+              url: http://loki.{{ .Values.namespace }}.svc.cluster.local:3100
+              access: proxy
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: {{ .Values.namespace }}
+  syncPolicy:
+    automated: {prune: true, selfHeal: true}
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true   # the Prometheus operator CRDs are too large for client-side apply

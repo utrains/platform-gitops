@@ -1,0 +1,86 @@
+{{- $team := .Values.team -}}
+{{- $p := .Values.platform -}}
+{{- range $env := $team.envs }}
+{{- $ns := printf "%s-%s" $team.name $env }}
+{{- /* prod: *.<team>.<domain>, other envs: *.<team>-<env>.<domain> */}}
+{{- $zone := printf "%s.%s" (eq $env "prod" | ternary $team.name $ns) $p.domain }}
+{{- $labels := include "team.labels" (dict "team" $team.name "env" $env) }}
+# HTTPS entry point of {{ $ns }}: a wildcard certificate and a Gateway on the SHARED ingress
+# (no new load balancer). The team publishes a service with an HTTPRoute in its namespace,
+# hostname <anything>.{{ $zone }}; ExternalDNS creates the DNS record from the route.
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: {{ $ns }}-tls
+  namespace: {{ $p.ingress.namespace }}
+  labels:
+    {{- $labels | nindent 4 }}
+spec:
+  secretName: {{ $ns }}-tls
+  dnsNames:
+    - "*.{{ $zone }}"
+  issuerRef:
+    kind: ClusterIssuer
+    name: {{ $p.clusterIssuer }}
+---
+apiVersion: gateway.networking.k8s.io/v1
+kind: Gateway
+metadata:
+  name: {{ $ns }}
+  namespace: {{ $p.ingress.namespace }}
+  labels:
+    {{- $labels | nindent 4 }}
+  annotations:
+    external-dns.alpha.kubernetes.io/target: {{ $p.ingress.lbHostname }}
+spec:
+  gatewayClassName: istio
+  addresses:
+    - type: Hostname
+      value: {{ $p.ingress.serviceDNS }}
+  listeners:
+    - name: http
+      port: 80
+      protocol: HTTP
+      hostname: "*.{{ $zone }}"
+      allowedRoutes:
+        namespaces:
+          from: Selector
+          selector:
+            matchLabels:
+              kubernetes.io/metadata.name: {{ $ns }}
+    - name: https
+      port: 443
+      protocol: HTTPS
+      hostname: "*.{{ $zone }}"
+      tls:
+        mode: Terminate
+        certificateRefs:
+          - name: {{ $ns }}-tls
+      allowedRoutes:
+        namespaces:
+          from: Selector
+          selector:
+            matchLabels:
+              kubernetes.io/metadata.name: {{ $ns }}
+---
+# Every plain-HTTP request of the team is redirected to HTTPS (no hostname: matches the whole wildcard)
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: https-redirect
+  namespace: {{ $ns }}
+  labels:
+    {{- $labels | nindent 4 }}
+spec:
+  parentRefs:
+    - name: {{ $ns }}
+      namespace: {{ $p.ingress.namespace }}
+      sectionName: http
+  rules:
+    - filters:
+        - type: RequestRedirect
+          requestRedirect:
+            scheme: https
+            statusCode: 301
+---
+{{- end }}
